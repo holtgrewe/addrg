@@ -4,13 +4,15 @@
 
 #include <htslib/sam.h>
 
+#define VERSION "0.2"
+
 int main(int argc, char *argv[]) {
     bam_hdr_t *header;
     bam1_t *read;
 
     samFile * in, * of;
 
-    if(argc < 3 || strcmp(argv[1], "-h") == 0) {
+    if (argc < 3 || strcmp(argv[1], "-h") == 0) {
         printf("Usage: %s file.bam rg-name [sm-name=rg-name] [platform=ILLUMINA]\n", argv[0]);
         printf("       e.g. %s some.bam rg-id\n", argv[0]);
         printf("            %s some.bam rg-id sm-name\n", argv[0]);
@@ -18,10 +20,12 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    fprintf(stderr, "addrg VERSION: %s\n", VERSION);
+
     char *rg = argv[2];
-    char *sm = argv[3];
+    char *sm = rg;
     if (argc >= 4)
-        sm = rg;
+        sm = argv[3];
     char *pl = "ILLUMINA";
     if (argc >= 5)
         pl = argv[4];
@@ -36,8 +40,16 @@ int main(int argc, char *argv[]) {
     char *rg_full = malloc(sizeof(char) * (strlen(rg) + strlen(sm) + strlen(pl) + strlen(fmt)));
     int rg_len = sprintf(rg_full, fmt, rg, sm, pl);
 
-    header->text = realloc(header->text, strlen(header->text) + rg_len);
-    header->l_text = sprintf(header->text, "%s%s\n", header->text, rg_full);
+    /* Ensure that header is NUL-padded */
+    if (header->text[header->l_text - 1] != '\0') {
+        header->text = realloc(header->text, header->l_text + 1);
+        header->text[header->l_text] = '\0';
+        header->l_text += 1;
+    }
+    /* Append header line */
+    header->text = realloc(header->text, header->l_text + rg_len);
+    strcat(header->text, rg_full);
+    header->l_text += rg_len;
 
     sam_hdr_write(of, header);
 
